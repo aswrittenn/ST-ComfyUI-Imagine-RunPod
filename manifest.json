@@ -1,7 +1,7 @@
 {
   "display_name": "ComfyUI-Imagine (RunPod)",
-  "version": "1.2.0-runpod.1",
-  "author": "ComfyUI-Imagine contributors",
+  "version": "1.2.0-runpod.2",
+  "author": "ComfyUI-Imagine contributors; RunPod S3 LoRA browser by OpenAI Codex",
   "license": "MIT",
   "js": "index.js",
   "css": "style.css",
