@@ -1,10 +1,10 @@
 <div align="center">
 
-# 📷 ComfyUI-Imagine
+# 📷 ComfyUI-Imagine (RunPod fork)
 
 **Illustrate your chat, one click at a time.**
 
-A [SillyTavern](https://github.com/SillyTavern/SillyTavern) extension that reads the scene you are in, writes an image prompt for it, renders it in [ComfyUI](https://github.com/comfyanonymous/ComfyUI), and drops the picture into the conversation.
+A [SillyTavern](https://github.com/SillyTavern/SillyTavern) extension that reads the scene you are in, writes an image prompt for it, renders it in [ComfyUI](https://github.com/comfyanonymous/ComfyUI) or RunPod Serverless, and drops the picture into the conversation.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![SillyTavern](https://img.shields.io/badge/SillyTavern-v1.18.0%2B-blueviolet)
@@ -26,7 +26,7 @@ A [SillyTavern](https://github.com/SillyTavern/SillyTavern) extension that reads
 
 - **Click 📷 on any message** and get an image of that moment in the story. Not just the latest message: pick any point in the chat, and the picture is inserted right there.
 - **Writes the prompt for you.** A small LLM reads the character card, your persona, and the recent chat, and turns them into an image prompt. You never write one by hand.
-- **Uses your ComfyUI, your models, your workflow.** Bring any API-format workflow. The extension finds nodes by title, so it does not care what your graph looks like.
+- **Uses your ComfyUI or RunPod Serverless, your models, your workflow.** Bring any API-format workflow. The extension finds nodes by title, so it does not care what your graph looks like.
 - **Remembers a LoRA per character.** Bind a LoRA to a character once and it loads automatically whenever they are active. No settings to change when you switch.
 
 Images are hidden from your main chat model, so illustrating a scene never changes how the character responds.
@@ -36,7 +36,7 @@ Images are hidden from your main chat model, so illustrating a scene never chang
 | You need | Details |
 |---|---|
 | **SillyTavern** | `release` v1.18.0 or newer, on desktop or mobile |
-| **ComfyUI** | a running instance, on the same computer or anywhere on your LAN |
+| **Image backend** | direct ComfyUI or RunPod Serverless with the RunPod ComfyUI worker |
 | **An LLM API** | any OpenAI-compatible endpoint: OpenRouter, OpenAI, a local KoboldCpp server, anything exposing `/chat/completions` |
 | **A ComfyUI workflow** | your own, or one of the two [example templates](workflows/) in this repo |
 
@@ -46,7 +46,7 @@ Optional but recommended: the [`ComfyUI-Image-Saver`](https://github.com/alexopu
 
 ## Quick Start
 
-Eight steps. Steps 1 and 2 happen in **ComfyUI**, the rest in **SillyTavern**.
+Eight steps. For RunPod Serverless, skip steps 1 and 2 and use the RunPod setup in step 4.
 
 ### 1. Start ComfyUI with the right flags
 
@@ -90,22 +90,26 @@ The example workflows use it to save **WebP** instead of PNG, which is roughly *
 
 ### 3. Install the extension
 
-In SillyTavern, open **Extensions → Install Extension**, paste this URL, and click **Install**:
+This fork is distributed as a ZIP. Extract the `ComfyUI-Imagine-RunPod` folder into SillyTavern's `public/scripts/extensions/third-party/` directory, restart SillyTavern, and enable **ComfyUI-Imagine (RunPod)** under Extensions. Open its panel in the extensions drawer.
 
-```
-https://github.com/mozophe/ST-ComfyUI-Imagine
-```
+### 4. Connect the image backend
 
-Open the **ComfyUI-Imagine** panel in the extensions drawer. Everything below happens there.
+In the **Connection** tab, choose **Direct ComfyUI** or **RunPod Serverless**.
 
-### 4. Connect to ComfyUI
-
-In the **Connection** tab, enter the base URL, then click **Test ComfyUI Connection**.
+For direct ComfyUI, enter the base URL and click **Test ComfyUI Connection**.
 
 - **Same computer:** `http://localhost:8188`
 - **Different computer:** the ComfyUI machine's LAN IP and port, for example `http://192.168.1.50:8188`
 
 Do not continue until this test passes. If it fails, see [Troubleshooting](#troubleshooting).
+
+For RunPod Serverless:
+
+1. In SillyTavern's **Extensions → Stable Diffusion** settings, select **RunPod Serverless Endpoint** and use its API key control to save your RunPod key in SillyTavern's secret store.
+2. In Imagine, select **RunPod Serverless**, enter `https://api.runpod.ai/v2/<endpoint-id>`, then click **Test RunPod Connection**. Do not put the key in the URL.
+3. Use a RunPod ComfyUI worker endpoint with the checkpoint and LoRAs available to its workers. RunPod mode uses the worker's default base64 image output; do not enable S3 output for this connector.
+
+In the **Character** tab, direct ComfyUI mode retrieves LoRA names automatically. RunPod mode has a filename/path field instead. Enter the exact file name or relative path under `ComfyUI/models/loras`. The workflow needs a `LoraLoader` node titled `IMAGINE_LORA`; the extension inserts the selected character's path and strength into that node.
 
 ### 5. Connect your prompt LLM
 
@@ -141,7 +145,7 @@ Either way, this setting is **independent of the model SillyTavern uses for chat
 A small cheap model is normally plenty. **Gemma 4 31B** (`google/gemma-4-31b-it` on OpenRouter) is a good default. Go larger only if the prompts you get are not detailed enough.
 
 > [!TIP]
-> **Make a dedicated API key for this extension and give it a low spending limit.** A browser-only extension has no backend, so the key is stored as plain text in your settings file. A scoped, low-cap key means an exposed key costs you nothing. See [Security](#security).
+> **Use a dedicated, low-limit key for the prompt LLM.** Imagine stores that LLM key in its extension settings. The RunPod key is handled separately by SillyTavern's server-side secret store.
 
 ### 6. Prepare and upload a workflow
 
@@ -507,7 +511,7 @@ If you have chats from those versions, open the extension settings, open the **C
 
 ## Security
 
-This extension stores your LLM API key as **plain text** in `data/<user>/settings.json`. A browser-only extension has no backend, so it cannot use SillyTavern's server-side key store (`secrets.json`) the way SillyTavern's own connections do. `settings.json` is the only place it can persist the key.
+This extension stores your prompt-LLM API key as **plain text** in `data/<user>/settings.json`. Its RunPod API key is not stored in Imagine's extension settings: RunPod generation is sent through SillyTavern's built-in server-side connector, which reads that key from SillyTavern's secret store.
 
 One habit makes this a non-issue: **use a dedicated API key with a low spending limit** for this extension, and do not share your `settings.json`, including in screenshots or copies posted when asking for help. Even if the key is exposed, the damage is capped.
 
