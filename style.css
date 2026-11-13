@@ -11,6 +11,10 @@
     --ci-radius: 8px;
 }
 
+#comfy-imagine-settings .comfy-imagine-hidden {
+    display: none !important;
+}
+
 /* Card: the grouping unit inside a tab. Each tab holds two or three. Without
    these the panel is an undifferentiated stack of rows, which is what the tab
    restructure briefly left behind when it dropped the old section separators. */
