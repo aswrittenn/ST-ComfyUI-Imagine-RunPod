@@ -15,7 +15,7 @@ const GENERATION_TIMEOUT_MS = 120_000;
 
 // Cached LoRA filename list from ComfyUI /object_info/LoraLoader. Populated on
 // first settings-panel render; reload button clears it to force a refetch.
-let loraListCache = null;
+let loraListCache = { comfy: null, runpod: null };
 
 // Baseline of image paths referenced by comfy-imagine messages in the current
 // chat. Diffed on MESSAGE_DELETED to find files whose messages were removed.
@@ -58,6 +58,10 @@ const defaultSettings = {
     backendMode: 'comfy', // 'comfy' or 'runpod'
     comfyUrl: 'http://192.168.1.x:8188',
     runpodUrl: '',
+    runpodVolumeId: '',
+    runpodVolumeDatacenter: '',
+    runpodS3AccessKey: '',
+    runpodS3SecretKey: '',
     llmBaseUrl: '',
     llmApiKey: '',
     llmModel: '',
@@ -175,6 +179,25 @@ async function fetchLoraList() {
     return names;
 }
 
+async function fetchRunpodVolumeLoraList() {
+    const s = getSettings();
+    const { getRequestHeaders } = SillyTavern.getContext();
+    const response = await fetch('/api/plugins/comfy-imagine-runpod-s3/loras', {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        body: JSON.stringify({
+            volumeId: s.runpodVolumeId,
+            datacenter: s.runpodVolumeDatacenter,
+            accessKey: s.runpodS3AccessKey,
+            secretKey: s.runpodS3SecretKey,
+        }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    if (!Array.isArray(data.loras)) throw new Error('Unexpected response from the SillyTavern helper');
+    return data.loras;
+}
+
 // True on phones/tablets. ST exposes isMobile() (Bowser UA) via getContext.
 function isMobileDevice() {
     const fn = SillyTavern.getContext()?.isMobile;
@@ -214,7 +237,8 @@ async function populateCharacterLoraUI() {
     const triggerEl = document.getElementById('comfy-imagine-lora-trigger');
     const manualEl = document.getElementById('comfy-imagine-lora-manual');
     const runpodMode = getSettings().backendMode === 'runpod';
-    document.getElementById('comfy-imagine-lora-select-row')?.classList.toggle('comfy-imagine-hidden', runpodMode);
+    const reloadButton = document.getElementById('comfy-imagine-lora-reload');
+    document.getElementById('comfy-imagine-lora-select-row')?.classList.remove('comfy-imagine-hidden');
     document.getElementById('comfy-imagine-lora-manual-row')?.classList.toggle('comfy-imagine-hidden', !runpodMode);
     if (!nameEl || !select) return;
 
@@ -230,40 +254,46 @@ async function populateCharacterLoraUI() {
         if (strengthEl) strengthEl.disabled = true;
         if (triggerEl) triggerEl.disabled = true;
         if (manualEl) manualEl.disabled = true;
+        if (reloadButton) reloadButton.disabled = true;
         return;
     }
     select.disabled = false;
     if (strengthEl) strengthEl.disabled = false;
     if (triggerEl) triggerEl.disabled = false;
     if (manualEl) manualEl.disabled = false;
+    if (reloadButton) reloadButton.disabled = false;
     nameEl.textContent = char.name ?? char.avatar;
 
     const saved = getSettings().characterLoras?.[char.avatar] ?? {};
-    if (runpodMode) {
-        if (manualEl) manualEl.value = saved.lora ?? '';
-        if (strengthEl) strengthEl.value = saved.strength ?? 1;
-        if (triggerEl) triggerEl.value = saved.trigger ?? '';
-        return;
-    }
-
-    if (!loraListCache) {
-        select.innerHTML = '<option value="">— loading… —</option>';
+    if (manualEl) manualEl.value = runpodMode ? (saved.lora ?? '') : '';
+    const cacheKey = runpodMode ? 'runpod' : 'comfy';
+    if (!loraListCache[cacheKey]) {
+        select.innerHTML = `<option value="">— loading from ${runpodMode ? 'RunPod volume' : 'ComfyUI'}… —</option>`;
         try {
-            loraListCache = await fetchLoraList();
-        } catch {
-            select.innerHTML = '<option value="">— fetch failed, check ComfyUI &amp; reload —</option>';
+            loraListCache[cacheKey] = runpodMode ? await fetchRunpodVolumeLoraList() : await fetchLoraList();
+        } catch (error) {
+            select.innerHTML = `<option value="">— fetch failed: ${String(error.message || error).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))} —</option>`;
+            if (strengthEl) strengthEl.value = saved.strength ?? 1;
+            if (triggerEl) triggerEl.value = saved.trigger ?? '';
             return;
         }
     }
 
     select.innerHTML = '<option value="">— none —</option>';
-    for (const name of loraListCache) {
+    const names = loraListCache[cacheKey];
+    for (const name of names) {
         const opt = document.createElement('option');
         opt.value = name;
         opt.textContent = name;
         select.appendChild(opt);
     }
-    select.value = (saved.lora && loraListCache.includes(saved.lora)) ? saved.lora : '';
+    if (saved.lora && !names.includes(saved.lora)) {
+        const missing = document.createElement('option');
+        missing.value = saved.lora;
+        missing.textContent = `${saved.lora} (not in current list)`;
+        select.appendChild(missing);
+    }
+    select.value = saved.lora ?? '';
     if (strengthEl) strengthEl.value = saved.strength ?? 1;
     if (triggerEl) triggerEl.value = saved.trigger ?? '';
 
@@ -281,7 +311,9 @@ function saveCharacterLora() {
     const manualEl = document.getElementById('comfy-imagine-lora-manual');
     const settings = getSettings();
     if (!settings.characterLoras) settings.characterLoras = {};
-    const lora = settings.backendMode === 'runpod' ? (manualEl?.value ?? '').trim() : (select?.value ?? '');
+    const lora = settings.backendMode === 'runpod' && (manualEl?.value ?? '').trim()
+        ? manualEl.value.trim()
+        : (select?.value ?? '');
     if (!lora) {
         delete settings.characterLoras[char.avatar];
     } else {
@@ -308,6 +340,10 @@ function loadSettingsIntoUI() {
     set('comfy-imagine-url', s.comfyUrl);
     set('comfy-imagine-backend', s.backendMode);
     set('comfy-imagine-runpod-url', s.runpodUrl);
+    set('comfy-imagine-runpod-volume-id', s.runpodVolumeId);
+    set('comfy-imagine-runpod-volume-dc', s.runpodVolumeDatacenter);
+    set('comfy-imagine-runpod-s3-access', s.runpodS3AccessKey);
+    set('comfy-imagine-runpod-s3-secret', s.runpodS3SecretKey);
     document.getElementById('comfy-imagine-comfy-settings')?.classList.toggle('comfy-imagine-hidden', s.backendMode === 'runpod');
     document.getElementById('comfy-imagine-runpod-settings')?.classList.toggle('comfy-imagine-hidden', s.backendMode !== 'runpod');
     set('comfy-imagine-llm-url', s.llmBaseUrl);
@@ -348,12 +384,17 @@ function bindSettingsEvents() {
         if (!el) return;
         el.addEventListener('input', () => {
             getSettings()[key] = transform ? transform(el.value) : el.value;
+            if (key.startsWith('runpodVolume') || key.startsWith('runpodS3')) loraListCache.runpod = null;
             saveSettings();
         });
     };
 
     bind('comfy-imagine-url', 'comfyUrl');
     bind('comfy-imagine-runpod-url', 'runpodUrl');
+    bind('comfy-imagine-runpod-volume-id', 'runpodVolumeId');
+    bind('comfy-imagine-runpod-volume-dc', 'runpodVolumeDatacenter');
+    bind('comfy-imagine-runpod-s3-access', 'runpodS3AccessKey');
+    bind('comfy-imagine-runpod-s3-secret', 'runpodS3SecretKey');
     document.getElementById('comfy-imagine-backend')?.addEventListener('change', e => {
         getSettings().backendMode = e.target.value;
         document.getElementById('comfy-imagine-comfy-settings')?.classList.toggle('comfy-imagine-hidden', e.target.value === 'runpod');
@@ -574,7 +615,7 @@ function bindSettingsEvents() {
         $('#comfy-imagine-lora-select').val('').trigger('change');
     });
     document.getElementById('comfy-imagine-lora-reload')?.addEventListener('click', () => {
-        loraListCache = null;
+        loraListCache[getSettings().backendMode === 'runpod' ? 'runpod' : 'comfy'] = null;
         populateCharacterLoraUI();
     });
 
