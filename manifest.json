@@ -1,7 +1,7 @@
 {
-  "display_name": "ComfyUI-Imagine",
-  "version": "1.1.0",
-  "author": "mozophe",
+  "display_name": "ComfyUI-Imagine (RunPod)",
+  "version": "1.2.0-runpod.1",
+  "author": "ComfyUI-Imagine contributors",
   "license": "MIT",
   "js": "index.js",
   "css": "style.css",
