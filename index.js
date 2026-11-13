@@ -649,14 +649,19 @@ function bindSettingsEvents() {
         statusEl.textContent = 'Testing…';
         statusEl.className = 'comfy-imagine-status';
         try {
+            const headers = s.llmApiKey ? { Authorization: `Bearer ${s.llmApiKey}` } : {};
+            if (new URL(base).origin === window.location.origin) {
+                Object.assign(headers, SillyTavern.getContext().getRequestHeaders());
+            }
             const resp = await fetch(`${base}/models`, {
-                headers: s.llmApiKey ? { Authorization: `Bearer ${s.llmApiKey}` } : {},
+                headers,
             });
             if (resp.ok) {
                 statusEl.textContent = 'Connected ✓';
                 statusEl.className = 'comfy-imagine-status success';
             } else {
-                statusEl.textContent = `Failed (HTTP ${resp.status})`;
+                const details = (await resp.text()).replace(/\s+/g, ' ').trim().slice(0, 240);
+                statusEl.textContent = `Failed (HTTP ${resp.status})${details ? ` — ${details}` : ''}`;
                 statusEl.className = 'comfy-imagine-status error';
             }
         } catch {
@@ -723,6 +728,13 @@ function assembleContext(uptoIndex = null) {
 async function generatePromptViaLLM(contextString, signal) {
     const s = getSettings();
     const baseUrl = s.llmBaseUrl.replace(/\/$/, '');
+    if (!baseUrl) throw new Error('LLM API Base URL is empty. Set it in Imagine → Connection.');
+    let llmUrl;
+    try {
+        llmUrl = new URL(`${baseUrl}/chat/completions`);
+    } catch {
+        throw new Error('LLM API Base URL must be a full URL, such as https://openrouter.ai/api/v1.');
+    }
     const body = {
         model: s.llmModel,
         messages: [
@@ -733,15 +745,20 @@ async function generatePromptViaLLM(contextString, signal) {
         temperature: s.temperature,
     };
 
-    const resp = await fetch(`${baseUrl}/chat/completions`, {
+    const headers = {
+        'Content-Type': 'application/json',
+        // Omit the header entirely when no key is set, matching the Test API
+        // Connection path. A local server may reject `Bearer ` with an empty
+        // token while accepting no header at all.
+        ...(s.llmApiKey ? { 'Authorization': `Bearer ${s.llmApiKey}` } : {}),
+    };
+    if (llmUrl.origin === window.location.origin) {
+        Object.assign(headers, SillyTavern.getContext().getRequestHeaders());
+    }
+
+    const resp = await fetch(llmUrl, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            // Omit the header entirely when no key is set, matching the Test API
-            // Connection path. A local server may reject `Bearer ` with an empty
-            // token while accepting no header at all.
-            ...(s.llmApiKey ? { 'Authorization': `Bearer ${s.llmApiKey}` } : {}),
-        },
+        headers,
         body: JSON.stringify(body),
         signal,
     });
