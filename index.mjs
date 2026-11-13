@@ -9,6 +9,10 @@ export const info = {
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const hmac = (key, value, encoding) => createHmac('sha256', key).update(value).digest(encoding);
 const awsEncode = value => encodeURIComponent(value).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+const s3Datacenters = new Set([
+    'EU-CZ-1', 'EU-RO-1', 'EUR-IS-1', 'EUR-NO-1', 'US-CA-2', 'US-GA-2', 'US-IL-1',
+    'US-KS-2', 'US-MD-1', 'US-MO-1', 'US-MO-2', 'US-NC-1', 'US-NC-2', 'US-NE-1', 'US-WA-1',
+]);
 
 function decodeXml(value) {
     return value.replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, entity) => {
@@ -66,6 +70,9 @@ export async function init(router) {
             }
             if (typeof datacenter !== 'string' || !/^[a-zA-Z0-9-]+$/.test(datacenter)) {
                 return response.status(400).json({ error: 'Enter the volume data-center ID, for example EU-SE-1.' });
+            }
+            if (!s3Datacenters.has(datacenter.toUpperCase())) {
+                return response.status(400).json({ error: `${datacenter.toUpperCase()} is not on RunPod's current S3-supported network-volume list. Check RunPod's S3-compatible API documentation for supported data centers.` });
             }
             if (typeof accessKey !== 'string' || !accessKey.trim() || typeof secretKey !== 'string' || !secretKey.trim()) {
                 return response.status(400).json({ error: 'Enter your RunPod S3 access key and secret key.' });
