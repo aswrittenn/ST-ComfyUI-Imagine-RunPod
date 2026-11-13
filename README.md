@@ -90,7 +90,13 @@ The example workflows use it to save **WebP** instead of PNG, which is roughly *
 
 ### 3. Install the extension
 
-This fork is distributed as a ZIP. Extract the `ComfyUI-Imagine-RunPod` folder into SillyTavern's `public/scripts/extensions/third-party/` directory, restart SillyTavern, and enable **ComfyUI-Imagine (RunPod)** under Extensions. Open its panel in the extensions drawer.
+In SillyTavern, open **Extensions → Install Extension**, paste this repository URL, and install:
+
+```
+https://github.com/aswrittenn/ST-ComfyUI-Imagine-RunPod
+```
+
+Restart SillyTavern if prompted, then enable **ComfyUI-Imagine (RunPod)** under Extensions and open its panel in the extensions drawer.
 
 ### 4. Connect the image backend
 
