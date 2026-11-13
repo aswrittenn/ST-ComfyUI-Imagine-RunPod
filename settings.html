@@ -33,13 +33,13 @@
                                 <button id="comfy-imagine-lora-clear" class="menu_button" title="Clear the LoRA for this character">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
-                                <button id="comfy-imagine-lora-reload" class="menu_button" title="Reload LoRA list from ComfyUI">
+                                <button id="comfy-imagine-lora-reload" class="menu_button" title="Refresh the LoRA list">
                                     <i class="fa-solid fa-rotate"></i>
                                 </button>
                             </div>
                         </div>
                         <div class="comfy-imagine-row comfy-imagine-hidden" id="comfy-imagine-lora-manual-row">
-                            <label for="comfy-imagine-lora-manual">LoRA filename/path</label>
+                            <label for="comfy-imagine-lora-manual">Manual filename/path (optional)</label>
                             <input id="comfy-imagine-lora-manual" type="text" class="text_pole" placeholder="e.g. character.safetensors" />
                         </div>
                         <div class="comfy-imagine-row">
@@ -51,7 +51,7 @@
                             <input id="comfy-imagine-lora-trigger" type="text" class="text_pole" placeholder="e.g. aliceface woman" />
                         </div>
                         <div class="comfy-imagine-info">
-                            For RunPod, enter the exact LoRA filename/path under <code>ComfyUI/models/loras</code>.
+                            For RunPod, refresh this list to browse <code>models/loras</code> on your network volume.
                             The trigger is injected into a node titled <code>IMAGINE_LORA_TRIGGER</code>,
                             typically concatenated before the prompt. Leave blank if the LoRA needs none.
                         </div>
@@ -65,8 +65,8 @@
                         <div class="comfy-imagine-info">
                             The active character's LoRA is injected automatically on <code>/imagine</code>.
                             Switch character and the LoRA follows, no settings change needed. In ComfyUI,
-                            title a <code>LoraLoader</code> node <code>IMAGINE_LORA</code>. The list is
-                            pulled live from ComfyUI.
+                            title a <code>LoraLoader</code> node <code>IMAGINE_LORA</code>. Local ComfyUI
+                            lists load from ComfyUI; RunPod lists load from the configured network volume.
                         </div>
                     </div>
                 </div>
@@ -235,6 +235,31 @@
                                 Imagine sends jobs through SillyTavern's built-in connector, so the key is not placed in this extension's browser settings.
                                 RunPod mode requires a serverless endpoint using the RunPod ComfyUI worker.
                             </div>
+                            <details class="comfy-imagine-row">
+                                <summary>Network volume LoRA browser</summary>
+                                <div class="comfy-imagine-info">
+                                    This reads the LoRA filenames from RunPod's S3-compatible volume API. It does not start a GPU worker. The endpoint still needs this same volume attached to load the selected LoRA during generation. S3 API keys are separate from your RunPod API key.
+                                </div>
+                                <div class="comfy-imagine-row">
+                                    <label for="comfy-imagine-runpod-volume-id">Network volume ID</label>
+                                    <input id="comfy-imagine-runpod-volume-id" type="text" class="text_pole" placeholder="RunPod volume ID" />
+                                </div>
+                                <div class="comfy-imagine-row">
+                                    <label for="comfy-imagine-runpod-volume-dc">Data center</label>
+                                    <input id="comfy-imagine-runpod-volume-dc" type="text" class="text_pole" placeholder="EU-SE-1" />
+                                </div>
+                                <div class="comfy-imagine-row">
+                                    <label for="comfy-imagine-runpod-s3-access">S3 access key</label>
+                                    <input id="comfy-imagine-runpod-s3-access" type="text" class="text_pole" placeholder="user_…" autocomplete="off" />
+                                </div>
+                                <div class="comfy-imagine-row">
+                                    <label for="comfy-imagine-runpod-s3-secret">S3 secret key</label>
+                                    <input id="comfy-imagine-runpod-s3-secret" type="password" class="text_pole" placeholder="rps_…" autocomplete="new-password" />
+                                </div>
+                                <div class="comfy-imagine-info">
+                                    These credentials are sent only to your SillyTavern server helper, which makes the signed list request to RunPod. They are stored in this SillyTavern extension's settings.
+                                </div>
+                            </details>
                         </div>
                     </div>
 
