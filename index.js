@@ -55,7 +55,9 @@ const DEFAULT_PRESET_NAME = 'Krea 2 (default)';
 const SHIPPED_PRESETS = new Set([DEFAULT_PRESET_NAME]);
 
 const defaultSettings = {
+    backendMode: 'comfy', // 'comfy' or 'runpod'
     comfyUrl: 'http://192.168.1.x:8188',
+    runpodUrl: '',
     llmBaseUrl: '',
     llmApiKey: '',
     llmModel: '',
@@ -210,6 +212,10 @@ async function populateCharacterLoraUI() {
     const select = document.getElementById('comfy-imagine-lora-select');
     const strengthEl = document.getElementById('comfy-imagine-lora-strength');
     const triggerEl = document.getElementById('comfy-imagine-lora-trigger');
+    const manualEl = document.getElementById('comfy-imagine-lora-manual');
+    const runpodMode = getSettings().backendMode === 'runpod';
+    document.getElementById('comfy-imagine-lora-select-row')?.classList.toggle('comfy-imagine-hidden', runpodMode);
+    document.getElementById('comfy-imagine-lora-manual-row')?.classList.toggle('comfy-imagine-hidden', !runpodMode);
     if (!nameEl || !select) return;
 
     // Tear down any existing select2 before mutating the underlying <select>.
@@ -223,12 +229,22 @@ async function populateCharacterLoraUI() {
         select.disabled = true;
         if (strengthEl) strengthEl.disabled = true;
         if (triggerEl) triggerEl.disabled = true;
+        if (manualEl) manualEl.disabled = true;
         return;
     }
     select.disabled = false;
     if (strengthEl) strengthEl.disabled = false;
     if (triggerEl) triggerEl.disabled = false;
+    if (manualEl) manualEl.disabled = false;
     nameEl.textContent = char.name ?? char.avatar;
+
+    const saved = getSettings().characterLoras?.[char.avatar] ?? {};
+    if (runpodMode) {
+        if (manualEl) manualEl.value = saved.lora ?? '';
+        if (strengthEl) strengthEl.value = saved.strength ?? 1;
+        if (triggerEl) triggerEl.value = saved.trigger ?? '';
+        return;
+    }
 
     if (!loraListCache) {
         select.innerHTML = '<option value="">— loading… —</option>';
@@ -240,7 +256,6 @@ async function populateCharacterLoraUI() {
         }
     }
 
-    const saved = getSettings().characterLoras?.[char.avatar] ?? {};
     select.innerHTML = '<option value="">— none —</option>';
     for (const name of loraListCache) {
         const opt = document.createElement('option');
@@ -263,9 +278,10 @@ function saveCharacterLora() {
     const select = document.getElementById('comfy-imagine-lora-select');
     const strengthEl = document.getElementById('comfy-imagine-lora-strength');
     const triggerEl = document.getElementById('comfy-imagine-lora-trigger');
+    const manualEl = document.getElementById('comfy-imagine-lora-manual');
     const settings = getSettings();
     if (!settings.characterLoras) settings.characterLoras = {};
-    const lora = select?.value ?? '';
+    const lora = settings.backendMode === 'runpod' ? (manualEl?.value ?? '').trim() : (select?.value ?? '');
     if (!lora) {
         delete settings.characterLoras[char.avatar];
     } else {
@@ -290,6 +306,10 @@ function loadSettingsIntoUI() {
     };
 
     set('comfy-imagine-url', s.comfyUrl);
+    set('comfy-imagine-backend', s.backendMode);
+    set('comfy-imagine-runpod-url', s.runpodUrl);
+    document.getElementById('comfy-imagine-comfy-settings')?.classList.toggle('comfy-imagine-hidden', s.backendMode === 'runpod');
+    document.getElementById('comfy-imagine-runpod-settings')?.classList.toggle('comfy-imagine-hidden', s.backendMode !== 'runpod');
     set('comfy-imagine-llm-url', s.llmBaseUrl);
     set('comfy-imagine-llm-key', s.llmApiKey);
     set('comfy-imagine-llm-model', s.llmModel);
@@ -333,6 +353,14 @@ function bindSettingsEvents() {
     };
 
     bind('comfy-imagine-url', 'comfyUrl');
+    bind('comfy-imagine-runpod-url', 'runpodUrl');
+    document.getElementById('comfy-imagine-backend')?.addEventListener('change', e => {
+        getSettings().backendMode = e.target.value;
+        document.getElementById('comfy-imagine-comfy-settings')?.classList.toggle('comfy-imagine-hidden', e.target.value === 'runpod');
+        document.getElementById('comfy-imagine-runpod-settings')?.classList.toggle('comfy-imagine-hidden', e.target.value !== 'runpod');
+        saveSettings();
+        populateCharacterLoraUI();
+    });
     bind('comfy-imagine-llm-url', 'llmBaseUrl');
     bind('comfy-imagine-llm-key', 'llmApiKey');
     bind('comfy-imagine-llm-model', 'llmModel');
@@ -475,6 +503,27 @@ function bindSettingsEvents() {
         }
     });
 
+    document.getElementById('comfy-imagine-test-runpod')?.addEventListener('click', async () => {
+        const statusEl = document.getElementById('comfy-imagine-runpod-status');
+        const url = getSettings().runpodUrl.trim().replace(/\/$/, '');
+        const { getRequestHeaders } = SillyTavern.getContext();
+        statusEl.textContent = 'Testing…';
+        statusEl.className = 'comfy-imagine-status';
+        try {
+            const resp = await fetch('/api/sd/comfyrunpod/ping', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({ url }),
+            });
+            if (!resp.ok) throw new Error(resp.status === 400 ? 'RunPod API key is missing in SillyTavern Secrets.' : `HTTP ${resp.status}`);
+            statusEl.textContent = 'Connected ✓';
+            statusEl.className = 'comfy-imagine-status success';
+        } catch (err) {
+            statusEl.textContent = err.message || 'Unreachable';
+            statusEl.className = 'comfy-imagine-status error';
+        }
+    });
+
     document.getElementById('comfy-imagine-workflow-upload')?.addEventListener('change', e => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -513,6 +562,7 @@ function bindSettingsEvents() {
     // 'change'; on mobile the native <select> emits a normal 'change'. jQuery
     // catches both. Survives select2 destroy/re-init.
     $('#comfy-imagine-lora-select').on('change', saveCharacterLora);
+    $('#comfy-imagine-lora-manual').on('input', saveCharacterLora);
     document.getElementById('comfy-imagine-lora-strength')?.addEventListener('input', saveCharacterLora);
     document.getElementById('comfy-imagine-lora-trigger')?.addEventListener('input', saveCharacterLora);
     // Clear reuses the handler above rather than saving directly, so there is
@@ -812,6 +862,26 @@ function injectCharacterLora(workflow) {
 
 async function submitAndPoll(workflowJson, signal) {
     const s = getSettings();
+    if (s.backendMode === 'runpod') {
+        const { getRequestHeaders } = SillyTavern.getContext();
+        const resp = await fetch('/api/sd/comfyrunpod/generate', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            signal,
+            body: JSON.stringify({
+                url: s.runpodUrl.replace(/\/$/, ''),
+                prompt: JSON.stringify({ prompt: { input: { workflow: workflowJson } } }),
+            }),
+        });
+        if (!resp.ok) {
+            const detail = await resp.text();
+            throw new Error(`RunPod generation failed (HTTP ${resp.status})${detail ? `: ${detail}` : ''}`);
+        }
+        const result = await resp.json();
+        if (!result?.data) throw new Error('RunPod returned no image data. Check the workflow has a SaveImage output.');
+        return { dataUrl: `data:image/${result.format || 'png'};base64,${result.data}` };
+    }
+
     const comfyUrl = s.comfyUrl.replace(/\/$/, '');
 
     let promptId;
@@ -862,7 +932,7 @@ async function submitAndPoll(workflowJson, signal) {
                             filename = filename.slice(slash + 1);
                             subfolder = subfolder ? `${subfolder}/${dir}` : dir;
                         }
-                        return `${comfyUrl}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}`;
+                        return { imageUrl: `${comfyUrl}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}` };
                     }
                 }
             }
@@ -1273,9 +1343,9 @@ async function generateImages({ targetIndex = null, signal = null } = {}) {
         // Per-image, so multi-image calls get an accurate comfy time each.
         const tComfyStart = performance.now();
 
-        let imageUrl;
+        let imageResult;
         try {
-            imageUrl = await submitAndPoll(workflow, signal);
+            imageResult = await submitAndPoll(workflow, signal);
         } catch (err) {
             if (err.name === 'AbortError') return '';
             if (err.message === 'timeout') {
@@ -1288,7 +1358,7 @@ async function generateImages({ targetIndex = null, signal = null } = {}) {
 
         let dataUrl;
         try {
-            dataUrl = await fetchImageAsDataUrl(imageUrl, signal);
+            dataUrl = imageResult.dataUrl ?? await fetchImageAsDataUrl(imageResult.imageUrl, signal);
         } catch (err) {
             if (err.name === 'AbortError') return '';
             toast('Comfy Imagine: Image generated but could not be retrieved.', 'error');
