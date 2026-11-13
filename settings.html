@@ -24,7 +24,7 @@
                             <i class="fa-solid fa-user"></i>
                             <span id="comfy-imagine-lora-charname">&mdash;</span>
                         </div>
-                        <div class="comfy-imagine-row">
+                        <div class="comfy-imagine-row" id="comfy-imagine-lora-select-row">
                             <label for="comfy-imagine-lora-select">LoRA</label>
                             <div class="comfy-imagine-row--inline">
                                 <select id="comfy-imagine-lora-select" class="text_pole">
@@ -38,6 +38,10 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="comfy-imagine-row comfy-imagine-hidden" id="comfy-imagine-lora-manual-row">
+                            <label for="comfy-imagine-lora-manual">LoRA filename/path</label>
+                            <input id="comfy-imagine-lora-manual" type="text" class="text_pole" placeholder="e.g. character.safetensors" />
+                        </div>
                         <div class="comfy-imagine-row">
                             <label for="comfy-imagine-lora-strength">Strength</label>
                             <input id="comfy-imagine-lora-strength" type="number" class="text_pole" min="-2" max="2" step="0.05" />
@@ -47,6 +51,7 @@
                             <input id="comfy-imagine-lora-trigger" type="text" class="text_pole" placeholder="e.g. aliceface woman" />
                         </div>
                         <div class="comfy-imagine-info">
+                            For RunPod, enter the exact LoRA filename/path under <code>ComfyUI/models/loras</code>.
                             The trigger is injected into a node titled <code>IMAGINE_LORA_TRIGGER</code>,
                             typically concatenated before the prompt. Leave blank if the LoRA needs none.
                         </div>
@@ -188,8 +193,16 @@
                     <div class="comfy-imagine-card">
                         <div class="comfy-imagine-card-title">
                             <i class="fa-solid fa-server"></i>
-                            <span>ComfyUI</span>
+                            <span>Image backend</span>
                         </div>
+                        <div class="comfy-imagine-row">
+                            <label for="comfy-imagine-backend">Backend type</label>
+                            <select id="comfy-imagine-backend" class="text_pole">
+                                <option value="comfy">Direct ComfyUI</option>
+                                <option value="runpod">RunPod Serverless</option>
+                            </select>
+                        </div>
+                        <div id="comfy-imagine-comfy-settings">
                         <div class="comfy-imagine-row">
                             <label for="comfy-imagine-url">Base URL</label>
                             <input id="comfy-imagine-url" type="text" class="text_pole" placeholder="http://192.168.1.x:8188" />
@@ -206,6 +219,22 @@
                             If ComfyUI runs on a <strong>different machine</strong> than SillyTavern,
                             <code>--enable-cors-header</code> is required — without it the browser blocks
                             cross-origin requests even if the port is reachable.
+                        </div>
+                        </div>
+                        <div id="comfy-imagine-runpod-settings" class="comfy-imagine-hidden">
+                            <div class="comfy-imagine-row">
+                                <label for="comfy-imagine-runpod-url">RunPod endpoint URL</label>
+                                <input id="comfy-imagine-runpod-url" type="text" class="text_pole" placeholder="https://api.runpod.ai/v2/ENDPOINT_ID" />
+                            </div>
+                            <div class="comfy-imagine-row--inline">
+                                <button id="comfy-imagine-test-runpod" class="menu_button"><i class="fa-solid fa-plug"></i> Test RunPod Connection</button>
+                                <span id="comfy-imagine-runpod-status" class="comfy-imagine-status"></span>
+                            </div>
+                            <div class="comfy-imagine-info">
+                            Add your RunPod API key in SillyTavern's <strong>Extensions → Stable Diffusion</strong> settings using its RunPod API key control.
+                                Imagine sends jobs through SillyTavern's built-in connector, so the key is not placed in this extension's browser settings.
+                                RunPod mode requires a serverless endpoint using the RunPod ComfyUI worker.
+                            </div>
                         </div>
                     </div>
 
