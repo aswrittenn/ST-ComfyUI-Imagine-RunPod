@@ -1,0 +1,6 @@
+{
+  "name": "comfy-imagine-runpod-s3-helper",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}
