@@ -115,7 +115,19 @@ For RunPod Serverless:
 2. In Imagine, select **RunPod Serverless**, enter `https://api.runpod.ai/v2/<endpoint-id>`, then click **Test RunPod Connection**. Do not put the key in the URL.
 3. Use a RunPod ComfyUI worker endpoint with the checkpoint and LoRAs available to its workers. RunPod mode uses the worker's default base64 image output; do not enable S3 output for this connector.
 
-In the **Character** tab, direct ComfyUI mode retrieves LoRA names automatically. RunPod mode has a filename/path field instead. Enter the exact file name or relative path under `ComfyUI/models/loras`. The workflow needs a `LoraLoader` node titled `IMAGINE_LORA`; the extension inserts the selected character's path and strength into that node.
+In the **Character** tab, direct ComfyUI mode retrieves LoRA names automatically. RunPod mode can list LoRAs from a RunPod network volume using its S3-compatible API. The workflow needs a `LoraLoader` node titled `IMAGINE_LORA`; the extension inserts the selected character's filename and strength into that node.
+
+### Browse RunPod network-volume LoRAs
+
+The browser extension cannot safely make authenticated S3 requests itself. This repository also includes a small SillyTavern server plugin (`index.mjs`) that proxies a read-only listing request. Install the repository once as an extension and once as a server plugin:
+
+```bash
+node plugins.js install https://github.com/aswrittenn/ST-ComfyUI-Imagine-RunPod
+```
+
+Enable server plugins in SillyTavern's `config.yaml` with `enableServerPlugins: true`, then restart SillyTavern. In **Imagine → Connection → Network volume LoRA browser**, enter the network volume ID, data-center ID, and S3 API credentials from RunPod's **Settings → S3 API Keys**. These are distinct from the RunPod API key used for image jobs. The volume must be in a data center with S3 API support. Press the Character tab's refresh button to list `.safetensors` files under `models/loras/` without starting a worker.
+
+Attach that same volume to the Serverless endpoint, and put LoRA files under `models/loras/` on the volume. The RunPod ComfyUI worker mounts it at `/runpod-volume` and exposes that directory to ComfyUI's LoRA loader. The selected path is relative to `models/loras/`; nested folders are supported. The extension stores the S3 credentials in its SillyTavern extension settings, then sends them only to the local SillyTavern server plugin for signing the list request.
 
 ### 5. Connect your prompt LLM
 
